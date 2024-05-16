@@ -1,58 +1,43 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+from typing import Dict, List, Optional, cast
 
-from __future__ import unicode_literals
-
-import time
-import base64
-
-try:
-    from typing import Any, Optional, List, Dict
-except ImportError:
-    from acme.magic_typing import Any, Optional, List, Dict  # type: ignore
-
-from .sweb_client import SWebError, SWebRPCError, SWebClient
+from .sweb_client import SWebClient
 
 
-class SWebAPI(object):
-    def __init__(
-        self,
-        client,  # type: SWebClient
-    ):
+class SWebAPI:
+    def __init__(self, client: SWebClient):
         self.client = client
 
     def jsonrpc(
         self,
-        endpoint,  # type: str
-        method,  # type: str
-        params=None,  # type: Optional[Dict[str, Any]]
-    ):
-        # type: (...) -> Any
+        endpoint: str,
+        method: str,
+        params: Optional[Dict[str, object]] = None,
+    ) -> object:
         return self.client.jsonrpc(endpoint, method, params)
 
-    def domains_dns_info(self, domain):
-        # type: (str) -> List[Dict[str, Any]]
-        return list(self.jsonrpc(
+    def domains_dns_info(self, domain: str) -> List[Dict[str, object]]:
+        raw_result = self.jsonrpc(
             "domains/dns",
             "info",
             {"domain": domain},
-        ))
+        )
+        return cast(List[Dict[str, object]], raw_result)
 
     def domains_dns_info_find(
         self,
-        domain,  # type: str
-        subdomain,  # type: str
-        type,  # type: str
-        data=None,  # type: Any
-    ):
-        # type: (...) -> List[Dict[str, Any]]
-        if data is None:
-            data = self.domains_dns_info(domain)
+        domain: str,
+        subdomain: str,
+        type: str,  # pylint: disable=redefined-builtin
+        *,
+        dns_info: Optional[List[Dict[str, object]]] = None,
+    ) -> List[Dict[str, object]]:
+        if dns_info is None:
+            dns_info = self.domains_dns_info(domain)
 
-        result = []  # type: List[Dict[str, Any]]
+        result: List[Dict[str, object]] = []
         find_main = bool(not subdomain or subdomain == "@")
 
-        for item in data:
+        for item in dns_info:
             # A/AAAA @/www
             if item["category"] == "zoneMain" and item["type"] == type:
                 if item["name"] == subdomain or find_main and item["name"] in ("", "@"):
@@ -87,19 +72,17 @@ class SWebAPI(object):
 
     def domains_dns_edit_txt(
         self,
-        domain,  # type: str
-        action,  # type: str
-        subdomain, # type: str
-        value=None,  # type: Optional[str]
-        index=None,  # type: Optional[int]
-    ):
-        # type: (...) -> int
-
-        params = {
+        domain: str,
+        action: str,
+        subdomain: str,
+        value: Optional[str] = None,
+        index: Optional[int] = None,
+    ) -> int:
+        params: Dict[str, object] = {
             "domain": domain,
             "action": action,  # add/edit/del
             "subDomain": subdomain or "@",
-        }  # type: Dict[str, Any]
+        }
 
         if value is not None:
             params["value"] = value
@@ -110,87 +93,9 @@ class SWebAPI(object):
         if action == "del":
             params["type"] = "TXT"
 
-        return self.jsonrpc(
+        raw_result = self.jsonrpc(
             "domains/dns",
             "editTxt",
             params,
         )
-
-    def vh_ssl_index(self):
-        # type: () -> Dict[str, Any]
-        return dict(self.jsonrpc(
-            "vh/ssl",
-            "index",
-        ))
-
-    def vh_ssl_get_customer_ips(self):
-        # type: () -> List[Dict[str, str]]
-        return list(self.jsonrpc(
-            "vh/ssl",
-            "getCustomerIps",
-        ))
-
-    def vh_ssl_install_certificate(
-        self,
-        crt,  # type: bytes
-        key,  # type: bytes
-        ca_bundles=None,  # type: Optional[List[bytes]]
-        domain=None,  # type: Optional[str]
-        ip="sni",  # type: str
-    ):
-        # type: (...) -> int
-
-        files = []  # type: List[Dict[str, str]]
-
-        files.append({
-            "name": "crt",
-            "base64": "data:application/x-x509-ca-cert;base64," + base64.b64encode(crt).decode("ascii"),
-        })
-        files.append({
-            "name": "key",
-            "base64": "data:application/x-x509-ca-cert;base64," + base64.b64encode(key).decode("ascii"),
-        })
-        for ca in ca_bundles or []:
-            files.append({
-                "name": "ca-bundle",
-                "base64": "data:application/x-x509-ca-cert;base64," + base64.b64encode(ca).decode("ascii"),
-            })
-
-        params = {
-            "domain": domain or None,
-            "ip": ip,
-            "files": files,
-        }  # type: Dict[str, Any]
-
-        # if it returns 2, you should repeat this call
-        return self.jsonrpc(
-            "vh/ssl",
-            "installCertificate",
-            params
-        )
-
-    def vh_ssl_remove_certificate(
-        self,
-        certificate_id,  # type: str
-    ):
-        # type: (...) -> int
-        return self.jsonrpc(
-            "vh/ssl",
-            "removeCertificate",
-            {"certificateId": certificate_id},
-        )
-
-    def vh_ssl_delete_inactive_certificates(self, data=None):
-        # type: (Any) -> List[Dict[str, Any]]
-        removed = []  # type: List[Dict[str, Any]]
-        if data is None:
-            data = self.vh_ssl_index()["list"]
-        for cert in data:
-            if removed:
-                time.sleep(3)
-            if cert.get("status", "").strip().lower() == "не активен":
-                removed.append(cert)
-                result = self.vh_ssl_remove_certificate(cert["id"])
-                if result not in (1, True):
-                    raise SWebError("Failed to remove certificate: unexpected result {!r}".format(result))
-        return removed
+        return int(cast(int, raw_result))

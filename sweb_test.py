@@ -1,40 +1,32 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-from __future__ import unicode_literals, print_function
-
+import getpass
+import random
 import sys
 import time
-import random
-import getpass
+from typing import cast
 
-from certbot_dns_sweb.sweb_client import SWebClient
 from certbot_dns_sweb.sweb_api import SWebAPI
-
-if sys.version_info.major != 2:
-    raw_input = input
-
+from certbot_dns_sweb.sweb_client import SWebClient
 
 if len(sys.argv) >= 2:
     username = sys.argv[1]
 else:
-    username = raw_input("Username: ")
+    username = input("Username: ")
 
 
 if len(sys.argv) >= 3:
     domain = sys.argv[2]
 else:
-    domain = raw_input("Domain to test: ")
+    domain = input("Domain to test: ")
 
 
 if sys.stdin.isatty():
     password = getpass.getpass()
 else:
-    password = raw_input('Password: ')
+    password = input("Password: ")
     print()
 
 if not password:
-    print('Password is not set')
+    print("Password is not set")
     sys.exit(1)
 
 
@@ -42,7 +34,7 @@ print("Authenticate on SpaceWeb...")
 c = SWebClient(
     username=username,
     password=password,
-    user_agent= "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/80.0.3987.87 Chrome/80.0.3987.87 Safari/537.36",
+    user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 )
 print("Successfully authenticated; api version", c.jsonrpc_api_version)
 api = SWebAPI(c)
@@ -57,7 +49,7 @@ print()
 
 
 print("Adding TXT record for _test-challenge.%s" % domain)
-value = str(random.randrange(10 ** 8, 10 ** 9))
+value = str(random.randrange(10**8, 10**9))
 time.sleep(3)
 
 edit_resp = api.domains_dns_edit_txt(
@@ -85,7 +77,7 @@ for x in api.domains_dns_info_find(
             domain=domain,
             action="del",
             subdomain="_test-challenge",
-            index=x["index"],
+            index=cast(int, x["index"]),
         )
         print("Response:", repr(del_resp))
         break

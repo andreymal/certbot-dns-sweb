@@ -1,26 +1,11 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-from __future__ import unicode_literals
-
-import re
 import json
 import random
-from datetime import datetime
+import re
+from datetime import datetime, timezone
+from typing import Dict, Optional, cast
+from urllib.parse import urljoin
 
 import requests
-
-try:
-    from typing import Any, Optional, Dict
-except ImportError:
-    from acme.magic_typing import Any, Optional, Dict  # type: ignore
-
-try:
-    # Python 3
-    from urllib.parse import urljoin
-except ImportError:
-    # Python 2
-    from urlparse import urljoin  # type: ignore
 
 
 class SWebError(Exception):
@@ -28,60 +13,64 @@ class SWebError(Exception):
 
 
 class SWebRPCError(SWebError):
-    def __init__(self, code, message, data=None):
-        # type: (int, str, Any) -> None
-        super(SWebRPCError, self).__init__(message)
+    def __init__(self, code: int, message: str, data: object = None):
+        super().__init__(message)
         self.code = code
         self.message = message
         self.data = data
 
 
-class SWebClient(object):
+class SWebClient:
     JSONRPC_BASE_URL = "https://cp.sweb.ru/"
     JSONRPC_ORIGIN = "https://cp.sweb.ru"
-    JSONRPC_REFERRER = "https://cp.sweb.ru/main"
+    JSONRPC_REFERRER = "https://cp.sweb.ru/main/"
 
     AUTH_PAGE_URL = "https://mcp.sweb.ru/main/auth/"
     AUTH_SUBMIT_URL = "https://mcp.sweb.ru/main/auth_submit/"
-    AUTH_REDIRECT_TO_URL = "//mcp.sweb.ru/main/index/"
-    AUTH_SUCCESS_LOCATION_URL = "https://cp.sweb.ru/"
+    AUTH_SUCCESS_LOCATION_URLS = {
+        "https://cp.sweb.ru",
+        "https://cp.sweb.ru/main",
+    }
 
     def __init__(
         self,
-        username,  # type: str
-        password,  # type: str
-        user_agent=None,  # type: Optional[str]
-        lazy_login=False,  # type: bool
+        username: str,
+        password: str,
+        *,
+        user_agent: Optional[str] = None,
+        lazy_login: bool = False,
     ):
-        # type: (...) -> None
-        import certbot_dns_sweb
-
         self.username = username
         self.password = password
+
+        if user_agent is None:
+            import importlib.metadata  # pylint: disable=import-outside-toplevel
+
+            ver = importlib.metadata.version("certbot_dns_sweb")
+            user_agent = f"Mozilla/5.0; certbot-dns-sweb/{ver}"
 
         self._je = json.JSONEncoder(ensure_ascii=True)
         self._jsonrpc_api_version = ""
         self._jsonrpc_user = ""
-        self._jsonrpc_dt = datetime.now()
+        self._jsonrpc_dt = datetime.now(timezone.utc)
         self._session = requests.Session()
-        self._session.headers.update({
-            "User-Agent": user_agent or "Mozilla/5.0; certbot-dns-sweb/{}".format(certbot_dns_sweb.__version__),
-        })
+        self._session.headers.update(
+            {
+                "User-Agent": user_agent,
+            },
+        )
 
         if not lazy_login:
             self.login()
 
     @property
-    def jsonrpc_api_version(self):
-        # type: () -> str
+    def jsonrpc_api_version(self) -> str:
         return self._jsonrpc_api_version
 
-    def login(self):
-        # type: () -> None
-
+    def login(self) -> None:
         # Grab cookies
         self._session.get(self.AUTH_PAGE_URL)
-        darksecret = str(self._session.cookies.get("darksecret", ""))  # type: ignore
+        darksecret = str(self._session.cookies.get("darksecret", ""))
 
         # send form
         resp = self._session.post(
@@ -90,18 +79,17 @@ class SWebClient(object):
                 "login": self.username,
                 "password": self.password,
                 "new_panel": "1",
-                "to": self.AUTH_REDIRECT_TO_URL,
                 "savepref": "",
                 "darksecret": darksecret,
             },
             headers={
                 "Referer": self.AUTH_PAGE_URL,
-                "Accept": "text/html, */*",
-            }
+                "Accept": "text/html,*/*",
+            },
         )
 
-        if resp.url != self.AUTH_SUCCESS_LOCATION_URL:
-            raise SWebError("Failed to log in (unexpected redirect {!r})".format(resp.url))
+        if resp.url.rstrip("/") not in self.AUTH_SUCCESS_LOCATION_URLS:
+            raise SWebError(f"Failed to log in (unexpected redirect {resp.url!r})")
 
         # get jsonrpc api version
         ver_script_url = ""
@@ -117,28 +105,22 @@ class SWebClient(object):
             if ver:
                 self._jsonrpc_api_version = ver[-1]
         if not self._jsonrpc_api_version:
-            raise SWebError(
-                "Failed to get JSONRPC_API_VERSION (tried to get script {!r})".format(ver_script_url)
-            )
+            raise SWebError(f"Failed to get JSONRPC_API_VERSION (tried to parse script {ver_script_url!r})")
 
         # get jsonrpc login
-        rpc_resp = dict(self.jsonrpc("account", "getLoginAndType"))
-        self._jsonrpc_user = rpc_resp["login"]
-        self._jsonrpc_dt = datetime.now()
+        rpc_resp = cast(Dict[str, object], self.jsonrpc("account", "getProperties"))
+        self._jsonrpc_user = str(rpc_resp["login"])
+        self._jsonrpc_dt = datetime.now(timezone.utc)
 
-    def random_string(self, l):
-        # type: (int) -> str
-
+    def random_string(self, l: int) -> str:
         return "".join(
-            random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
-            for _ in range(l)
+            random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") for _ in range(l)
         )
 
-    def gen_jsonrpc_id(self):
-        # type: () -> str
-
+    def gen_jsonrpc_id(self) -> str:
         # mimic the js behavior
         dt = self._jsonrpc_dt
+        # pylint: disable=consider-using-f-string
         return "{}{}{}{}{}{}.{}".format(
             dt.year,
             dt.month - 1,  # sic!
@@ -151,11 +133,10 @@ class SWebClient(object):
 
     def jsonrpc(
         self,
-        endpoint,  # type: str
-        method,  # type: str
-        params=None,  # type: Optional[Dict[str, Any]]
-    ):
-        # type: (...) -> Any
+        endpoint: str,
+        method: str,
+        params: Optional[Dict[str, object]] = None,
+    ) -> object:
         if not self._jsonrpc_api_version:
             raise SWebError("Missing JSONRPC_API_VERSION (forgot to log in?)")
         data = {
@@ -176,8 +157,9 @@ class SWebClient(object):
                 "Referer": self.JSONRPC_REFERRER,
                 "Origin": self.JSONRPC_ORIGIN,
                 "Accept": "application/json, text/plain, */*",
-                "Content-Type": "application/x-www-form-urlencoded",  # Не знаю почему, но так отправляет js
-            }
+                # js-код зачем-то использует url-кодирование, но всё работает и так, так что ладно, наверное?
+                "Content-Type": "application/json",
+            },
         )
 
         json_data = dict(resp.json())

@@ -12,16 +12,14 @@ SpaceWeb (https://sweb.ru/).
 
 ## Установка
 
-Если `certbot` установлен глобально в системе, то придётся в ней помусорить.
-Используйте `pip`, соответствующий той версии Python, для которой у вас
-установлен Certbot (`pip2` или `pip3`):
+Установите плагин в том же окружении, в котором установлен Certbot.
 
-    pip install git+https://github.com/andreymal/certbot-dns-sweb.git#egg=certbot-dns-sweb
+    pip install git+https://github.com/andreymal/certbot-dns-sweb.git
 
-Если вы используете `certbot-auto`, то нужно установить плагин внутри его
-виртуального окружения (virtualenv):
-
-    /opt/eff.org/certbot/venv/bin/pip install git+https://github.com/andreymal/certbot-dns-sweb.git#egg=certbot-dns-sweb
+Если `certbot` установлен глобально в системе, то придётся в ней помусорить
+(и, возможно, добавить опцию `--break-system-packages`, но если Certbot
+уже установлен, то ничего сломаться не должно, так как плагин не имеет
+дополнительных зависимостей).
 
 
 ## Использование
@@ -33,10 +31,10 @@ SpaceWeb (https://sweb.ru/).
 Создайте текстовый файл где-нибудь (например `/etc/letsencrypt/sweb.ini`)
 и запишите туда логин и пароль, а также юзер-агент по вкусу:
 
-    certbot_dns_sweb:dns_sweb_username = subname@username
-    certbot_dns_sweb:dns_sweb_password = correcthorsebatterystaple
-    certbot_dns_sweb:dns_sweb_user_agent = "Mozilla/5.0 definitely-not-a-robot/999.99"
-    certbot_dns_sweb:dns_sweb_drop_old_txt = 1
+    dns_sweb_username = subname@username
+    dns_sweb_password = correcthorsebatterystaple
+    dns_sweb_user_agent = "Mozilla/5.0 definitely-not-a-robot/999.99"
+    dns_sweb_drop_old_txt = 1
 
 Опция `drop_old_txt` включает удаление старых записей `_acme-challenge`,
 так как они могут мешать проверке.
@@ -48,8 +46,8 @@ SpaceWeb (https://sweb.ru/).
 Запросите сертификат с нужными вам настройками (в примере `certonly`,
 не забудьте отредактировать команду на свой вкус):
 
-    certbot certonly -a certbot-dns-sweb:dns-sweb \
-      --certbot-dns-sweb:dns-sweb-credentials /etc/letsencrypt/sweb.ini \
+    certbot certonly -a dns-sweb \
+      --dns-sweb-credentials /etc/letsencrypt/sweb.ini \
       -d "example.ru" -d "*.example.ru"
 
 Плагин создаст TXT-записи `_acme-challenge`, после чего придётся подождать
@@ -61,8 +59,8 @@ SpaceWeb (https://sweb.ru/).
 Если вы получите ошибку «Incorrect TXT record», есть следующие варианты:
 
 - возможно, кэши DNS так и не успели почиститься, тогда можно изменить время
-  ожидания опцией `--certbot-dns-sweb:dns-sweb-propagation-seconds 1800`
-  (указывается в секундах);
+  ожидания опцией `--dns-sweb-propagation-seconds 1800` (указывается
+  в секундах);
 
 - вы не включили опцию `drop_old_txt`, у вас остались какие-то старые
   DNS-записи `_acme-challenge` и они мешаются; удалите их вручную в панели

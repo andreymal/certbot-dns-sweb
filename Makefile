@@ -1,7 +1,7 @@
 .PHONY: help clean clean-build clean-pyc dist install develop
 
-PYTHON?=python
-PIP?=pip
+PYTHON?=python3
+PIP?=pip3
 FIND?=find
 
 help:
@@ -31,11 +31,11 @@ clean-pyc:
 	$(FIND) . -name '__pycache__' -exec rm -fr {} +
 
 dist: clean
-	$(PYTHON) setup.py sdist
+	$(PYTHON) -m build --no-isolation
 	ls -lh dist
 
 install: clean
 	$(PIP) install .
 
 develop:
-	$(PIP) install -e .
+	$(PIP) install --upgrade --upgrade-strategy eager -e ".[dev]"

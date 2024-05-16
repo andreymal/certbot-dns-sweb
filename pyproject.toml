@@ -1,0 +1,83 @@
+[project]
+name = "certbot_dns_sweb"
+version = "2024.5.16"
+description = "SpaceWeb DNS Authenticator plugin for Certbot"
+license = {text = "MIT License"}
+authors = [
+    {name = "andreymal"},
+]
+requires-python = ">= 3.8"
+dependencies = [
+    "certbot>=2.0",
+    "requests>=2.20",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Plugins",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Security",
+    "Topic :: System :: Installation/Setup",
+    "Topic :: System :: Networking",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+
+[project.entry-points."certbot.plugins"]
+dns-sweb = "certbot_dns_sweb.dns_sweb:Authenticator"
+
+[project.optional-dependencies]
+dev = [
+    "build",
+    "wheel",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["certbot_dns_sweb", "certbot_dns_sweb.*"]
+
+[tool.black]
+line-length = 110
+target-version = ["py38"]
+
+[tool.isort]
+profile = "black"
+line_length = 110
+py_version = "38"
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.8"
+strict = true
+files = ["certbot_dns_sweb", "sweb_test.py"]
+
+[tool.pylint.main]
+jobs = 0
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+    "duplicate-code",
+    "invalid-name",
+    "line-too-long",
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "too-many-ancestors",
+    "too-few-public-methods",
+    "too-many-public-methods",
+    "too-many-arguments",
+    "too-many-branches",
+    "too-many-instance-attributes",
+    "too-many-locals",
+    "too-many-statements",
+]
