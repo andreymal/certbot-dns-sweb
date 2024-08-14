@@ -34,7 +34,7 @@ print("Authenticate on SpaceWeb...")
 c = SWebClient(
     username=username,
     password=password,
-    user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
 )
 print("Successfully authenticated; api version", c.jsonrpc_api_version)
 api = SWebAPI(c)
@@ -48,7 +48,7 @@ for x in api.domains_dns_info(domain):
 print()
 
 
-print("Adding TXT record for _test-challenge.%s" % domain)
+print(f"Adding TXT record for _test-challenge.{domain}")
 value = str(random.randrange(10**8, 10**9))
 time.sleep(3)
 
@@ -61,7 +61,8 @@ edit_resp = api.domains_dns_edit_txt(
 
 print("Response:", repr(edit_resp))
 
-time.sleep(6)
+print("Press Enter to remove the TXT record")
+input()
 
 del_resp = None
 
@@ -71,7 +72,7 @@ for x in api.domains_dns_info_find(
     type="TXT",
 ):
     if x["value"] == value:
-        print("Removing TXT record for _test-challenge.%s" % domain)
+        print(f"Removing TXT record for _test-challenge.{domain}")
         time.sleep(3)
         del_resp = api.domains_dns_edit_txt(
             domain=domain,

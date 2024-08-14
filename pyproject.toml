@@ -1,6 +1,6 @@
 [project]
 name = "certbot_dns_sweb"
-version = "2024.5.16"
+version = "2024.8.14"
 description = "SpaceWeb DNS Authenticator plugin for Certbot"
 license = {text = "MIT License"}
 authors = [

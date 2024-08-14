@@ -3,7 +3,7 @@ import random
 import re
 from datetime import datetime, timezone
 from typing import Dict, Optional, cast
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -21,15 +21,13 @@ class SWebRPCError(SWebError):
 
 
 class SWebClient:
-    JSONRPC_BASE_URL = "https://cp.sweb.ru/"
-    JSONRPC_ORIGIN = "https://cp.sweb.ru"
-    JSONRPC_REFERRER = "https://cp.sweb.ru/main/"
-
     AUTH_PAGE_URL = "https://mcp.sweb.ru/main/auth/"
     AUTH_SUBMIT_URL = "https://mcp.sweb.ru/main/auth_submit/"
     AUTH_SUCCESS_LOCATION_URLS = {
         "https://cp.sweb.ru",
         "https://cp.sweb.ru/main",
+        "https://vps.sweb.ru",
+        "https://vps.sweb.ru/main",
     }
 
     def __init__(
@@ -50,9 +48,14 @@ class SWebClient:
             user_agent = f"Mozilla/5.0; certbot-dns-sweb/{ver}"
 
         self._je = json.JSONEncoder(ensure_ascii=True)
+
+        self._jsonrpc_base_url = "https://cp.sweb.ru/"
+        self._jsonrpc_origin = "https://cp.sweb.ru"
+        self._jsonrpc_referrer = "https://cp.sweb.ru/main/"
         self._jsonrpc_api_version = ""
         self._jsonrpc_user = ""
         self._jsonrpc_dt = datetime.now(timezone.utc)
+
         self._session = requests.Session()
         self._session.headers.update(
             {
@@ -90,6 +93,11 @@ class SWebClient:
 
         if resp.url.rstrip("/") not in self.AUTH_SUCCESS_LOCATION_URLS:
             raise SWebError(f"Failed to log in (unexpected redirect {resp.url!r})")
+
+        domain = urlparse(resp.url).netloc
+        self._jsonrpc_base_url = f"https://{domain}/"
+        self._jsonrpc_origin = f"https://{domain}"
+        self._jsonrpc_referrer = f"https://{domain}/main/"
 
         # get jsonrpc api version
         ver_script_url = ""
@@ -151,11 +159,11 @@ class SWebClient:
             data.pop("user")
 
         resp = self._session.post(
-            self.JSONRPC_BASE_URL + endpoint,
+            self._jsonrpc_base_url + endpoint,
             data=self._je.encode(data).encode("utf-8"),
             headers={
-                "Referer": self.JSONRPC_REFERRER,
-                "Origin": self.JSONRPC_ORIGIN,
+                "Referer": self._jsonrpc_referrer,
+                "Origin": self._jsonrpc_origin,
                 "Accept": "application/json, text/plain, */*",
                 # js-код зачем-то использует url-кодирование, но всё работает и так, так что ладно, наверное?
                 "Content-Type": "application/json",
